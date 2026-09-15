@@ -1,0 +1,4 @@
+# MIRA arm — simulation & viewer
+mujoco>=3.0
+numpy>=1.24
+pillow>=10.0

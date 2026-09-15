@@ -1,0 +1,16 @@
+outputs/
+__pycache__/
+*.pyc
+.venv/
+data/
+*.pt
+*.pth
+*.safetensors
+.env
+wandb/
+runs/
+logs/
+*.log
+MUJOCO_LOG.TXT
+.omo/
+.codegraph/
