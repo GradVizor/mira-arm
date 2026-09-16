@@ -1,0 +1,30 @@
+services:
+  mira-arm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mira-arm:latest
+    container_name: mira-arm
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      # Optional: force a MuJoCo render backend. Leave empty to let the scripts
+      # self-select — sim.py picks egl (NVIDIA GPU present) or osmesa; view.py
+      # opens a glfw window when MUJOCO_GL is unset.
+      - MUJOCO_GL=${MUJOCO_GL:-}
+      - XVFB_RUN=${XVFB_RUN:-0}
+      - HOST_UID=${UID:-1000}
+      - HOST_GID=${GID:-1000}
+    volumes:
+      - .:/workspace
+      # X11 socket for the interactive viewer (scripts/view.py). Inert when the
+      # host has no X server; pair with `xhost +local:root` on the host.
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    ipc: host
+    shm_size: 2gb
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    working_dir: /workspace
+    tty: true
+    stdin_open: true
+    command: ["bash"]

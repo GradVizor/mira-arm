@@ -14,6 +14,11 @@ Contains a MuJoCo (MJCF) model of the SO-101 arm, two Python scripts (headless s
 ├── AGENTS.md               # this file
 ├── .gitignore              # outputs/, caches, model artifacts, agent state
 ├── requirements.txt        # unpinned deps: mujoco, numpy, pillow
+├── Dockerfile              # lean python:3.12-slim image: sim + viewer (EGL/osmesa/GLFW libs)
+├── docker-compose.yaml     # CPU compose — mira-arm service, X11 socket mount
+├── docker-compose.gpu.yaml # NVIDIA override — gpus: all (needs NVIDIA Container Toolkit)
+├── entrypoint.sh           # stack smoke-check, optional Xvfb, HOST_UID/GID chown
+├── .dockerignore           # keeps outputs/, .git, caches out of the build context
 ├── models/
 │   └── so101/              # MJCF model — XML + assets/ MUST stay together
 │       ├── scene.xml           # entry point; <include>s the active calibration XML
@@ -37,6 +42,9 @@ Contains a MuJoCo (MJCF) model of the SO-101 arm, two Python scripts (headless s
 | Change simulation behavior / rendering | `scripts/sim.py` |
 | Change viewer behavior | `scripts/view.py` |
 | Add Python dependencies | `requirements.txt` (keep unpinned `>=`) |
+| Change container image / system deps | `Dockerfile` (base is `python:3.12-slim`; apt GL/EGL/osmesa/GLFW libs) |
+| Change container entrypoint | `entrypoint.sh` (must NOT export `MUJOCO_GL` — see CONVENTIONS) |
+| Change compose / GPU override | `docker-compose.yaml` / `docker-compose.gpu.yaml` (`mira-arm` service) |
 
 ## CODE MAP
 
@@ -64,12 +72,20 @@ python scripts/sim.py --out /tmp/out --no-gif
 python scripts/view.py           # interactive X11 viewer (auto demo)
 python scripts/view.py --manual  # drag sliders in the left panel
 python -m py_compile scripts/sim.py scripts/view.py   # syntax smoke test
+
+docker compose up -d                                    # CPU container → bash shell
+docker compose -f docker-compose.yaml -f docker-compose.gpu.yaml up -d   # NVIDIA GPU host
+docker compose exec mira-arm bash                       # interactive shell
+docker compose config                                   # validate compose files
+bash -n entrypoint.sh                                   # entrypoint syntax check
 ```
 
 ## CONVENTIONS
 
 - `sim.py` sets `MUJOCO_GL` **before** `import mujoco` via `_pick_gl` (explicit env var wins; else EGL if `nvidia-smi` present, else osmesa). Preserve that ordering.
 - `view.py` defaults to `glfw` (windowed) unless `MUJOCO_GL` is set.
+- Renderer selection lives in the scripts, not the container: `sim.py` auto-picks EGL (NVIDIA) vs osmesa, `view.py` uses a glfw window when `MUJOCO_GL` is unset. `entrypoint.sh` must **not** export `MUJOCO_GL`, or it would force `view.py` off its window.
+- Compose image/container/service are all named `mira-arm`; `docker-compose.gpu.yaml` is an override, always used with `-f docker-compose.yaml -f docker-compose.gpu.yaml`.
 - Paths are derived from `Path(__file__).resolve().parent.parent` (repo root) — scripts work from anywhere.
 - `requirements.txt` is unpinned (`>=`), matching the parent repo convention.
 - `outputs/` is a regenerable artifact directory — delete freely, never commit.
@@ -81,7 +97,7 @@ python -m py_compile scripts/sim.py scripts/view.py   # syntax smoke test
 
 ## VERIFICATION
 
-No lint/typecheck/test targets exist. Smoke test: `python -m py_compile scripts/sim.py scripts/view.py` passes, and `python scripts/sim.py` completes with non-blank frames (the script's own mid-frame mean-pixel check reports `non-blank`).
+No lint/typecheck/test targets exist. Smoke test: `python -m py_compile scripts/sim.py scripts/view.py` passes, `bash -n entrypoint.sh` passes, `docker compose config` validates both compose files, and `python scripts/sim.py` completes with non-blank frames (the script's own mid-frame mean-pixel check reports `non-blank`).
 
 ## NOTES
 
@@ -90,4 +106,5 @@ No lint/typecheck/test targets exist. Smoke test: `python -m py_compile scripts/
 - LeRobot treats the gripper as a linear joint (`0`=closed, `100`=open); this mapping is **not yet reflected** in the MJCF.
 - `view.py` ends with `os._exit(0)` — skips interpreter teardown once `launch_passive` closes; don't "fix" it into a normal exit path.
 - Calibration XMLs reference the same 13 STL meshes in `assets/`; far-field/branch meshes are shared by `<include>` — never deduplicate "identical" XML blocks by hand, they encode different joint zeros.
+- `.dockerignore` mirrors `.gitignore` (plus `.git`) so `outputs/` and caches never enter the Docker build context.
 - `.omo/` and `.codegraph/` are gitignored agent/editor state — never treat them as sources.

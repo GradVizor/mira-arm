@@ -1,0 +1,15 @@
+# GPU override — use ONLY on hosts with an NVIDIA GPU + NVIDIA Container Toolkit.
+#
+#   docker compose -f docker-compose.yaml -f docker-compose.gpu.yaml up -d
+#
+# The base compose file intentionally omits GPU access so CPU-only hosts
+# (`docker compose up -d`) work out of the box; the scripts auto-fall back to
+# osmesa software rendering when no nvidia-smi is present. The GPU is used for
+# hardware-accelerated EGL rendering (sim.py) today and RL/VLA training later.
+
+services:
+  mira-arm:
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    gpus: all

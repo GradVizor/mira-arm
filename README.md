@@ -8,6 +8,8 @@ Personal repository for a robotic arm based on the **SO-ARM101 (SO-101)** 6-DOF 
 |---|---|
 | `models/so101/` | MuJoCo (MJCF) model: `scene.xml`, calibration XMLs, `joints_properties.xml`, and `assets/` (13 STL meshes). XML + STL assets must stay together (`meshdir="assets"` is relative). |
 | `scripts/` | `sim.py` (headless sinusoidal demo → PNGs + GIF into `outputs/`) and `view.py` (interactive X11 viewer). |
+| `Dockerfile` + `entrypoint.sh` + `.dockerignore` | Container image for the sim + viewer (lean `python:3.12-slim`, EGL/osmesa/GLFW rendering libs). |
+| `docker-compose.yaml` / `docker-compose.gpu.yaml` | CPU / NVIDIA-GPU container config; `mira-arm` service (see [Docker](#docker)). |
 | `outputs/` | Generated render artifacts (gitignored, regenerable). |
 
 ## Hardware
@@ -50,6 +52,20 @@ python scripts/view.py --max-time 30         # auto-close after 30 s
 ```
 
 The X11 viewer needs a display (X11/GLFW).
+
+## Docker
+
+```bash
+docker compose up -d                                        # CPU-only host (osmesa software rendering)
+docker compose -f docker-compose.yaml -f docker-compose.gpu.yaml up -d   # NVIDIA GPU host
+docker compose exec mira-arm bash                           # interactive shell in the container
+python scripts/sim.py                                       # inside the container → outputs/ on the host
+```
+
+- `docker-compose.gpu.yaml` is an override, not a standalone file — it requires the NVIDIA Container Toolkit on the host (`gpus: all`).
+- The render backend is chosen by the scripts, not the container: `sim.py` picks EGL when an NVIDIA GPU is visible and osmesa elsewhere; `view.py` opens a GLFW window when `MUJOCO_GL` is unset. Set `MUJOCO_GL` to force a backend.
+- `entrypoint.sh` smoke-checks the stack, starts a virtual display when `XVFB_RUN=1`, and keeps bind-mounted files owned by your host user (`HOST_UID`/`HOST_GID`).
+- The interactive viewer inside the container needs a host X server: `xhost +local:root`, then `docker compose exec mira-arm python scripts/view.py`.
 
 ## Roadmap
 
