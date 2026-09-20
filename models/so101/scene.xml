@@ -15,10 +15,56 @@
             markrgb="0.8 0.8 0.8" width="300" height="300" />
         <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5"
             reflectance="0.2" />
+        <material name="marshmallow" rgba="1 1 1 1" specular="0.1" shininess="0.2" />
+        <material name="ceramic_white" rgba="0.95 0.95 0.97 1" specular="0.6" shininess="0.8" />
+        <material name="coffee" rgba="0.25 0.12 0.05 1" specular="0.2" shininess="0.3" />
+        <!-- Mug visual: sleek-blue-mug (100ml) GrabCAD snapshot, baked to
+             meters/Z-up, 8 cm tall, base at local z=0, handle toward +X.
+             Source snapshot dir removed after baking; only this STL stays. -->
+        <mesh file="coffee_mug.stl" />
     </asset>
 
     <worldbody>
         <light pos="0 0 3.5" dir="0 0 -1" directional="true" />
         <geom name="floor" size="0 0 0.05" pos="0 0 0" type="plane" material="groundplane" />
+
+        <!-- Pick-and-place props: dynamic bodies (freejoint) so the arm can
+             grasp/move them later. Kept in scene.xml (not the calibration
+             XML) so recalibration never touches them. -->
+        <!-- Coffee mug: hollow so the marshmallow can be dropped inside.
+             Visuals come from the coffee_mug.stl mesh (no collision).
+             Contact comes from bottom disc + 4 wall boxes tucked WELL
+             inside the mesh silhouette (mesh body radius ~0.034, faceted):
+             outer faces at 0.024 with ~10 mm clearance so no collision
+             geometry ever pokes through the mesh from any orbit angle.
+             Origin at the cavity axis on the floor; mesh base sits at
+             local z=0, handle points +X (away from the arm). -->
+        <body name="coffee_cup" pos="0.20 -0.12 0.0">
+            <freejoint name="coffee_cup_free" />
+            <geom name="cup_visual" type="mesh" mesh="coffee_mug" pos="0 0 0"
+                material="ceramic_white" contype="0" conaffinity="0" />
+            <geom name="cup_bottom" type="cylinder" size="0.024 0.005" pos="0 0 0.005"
+                material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_n" type="box" size="0.024 0.0025 0.0325" pos="0 0.0215 0.0375"
+                material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_s" type="box" size="0.024 0.0025 0.0325" pos="0 -0.0215 0.0375"
+                material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_e" type="box" size="0.0025 0.024 0.0325" pos="0.0215 0 0.0375"
+                material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_w" type="box" size="0.0025 0.024 0.0325" pos="-0.0215 0 0.0375"
+                material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <!-- Coffee surface: visual only, recessed inside the cavity -->
+            <geom name="coffee_surface" type="cylinder" size="0.020 0.003" pos="0 0 0.058"
+                material="coffee" contype="0" conaffinity="0" />
+            <site name="cup_site" pos="0 0 0.085" size="0.005" />
+        </body>
+
+        <!-- Marshmallow cube: 2.5 cm light box, graspable by the SO-101 jaw -->
+        <body name="marshmallow" pos="0.16 0.11 0.0125">
+            <freejoint name="marshmallow_free" />
+            <geom name="marshmallow_geom" type="box" size="0.0125 0.0125 0.0125"
+                material="marshmallow" density="300" friction="0.9 0.1 0.1" />
+            <site name="marshmallow_site" pos="0 0 0" size="0.004" />
+        </body>
     </worldbody>
 </mujoco>
