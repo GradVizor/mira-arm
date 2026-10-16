@@ -1,7 +1,7 @@
 # MIRA — PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-09-21
-**Commit:** d80f0f7
+**Generated:** 2026-10-14
+**Commit:** d33014e
 **Branch:** main
 
 MIRA (Multimodal Intelligent Robotic Arm) — personal robotic-arm repo based on the SO-ARM101 (SO-101) 6-DOF arm. MuJoCo models, headless simulation, and an interactive viewer; a platform for multimodal (vision + language + action) robotics research.
@@ -27,14 +27,20 @@ Contains a MuJoCo (MJCF) model of the SO-101 arm, two Python scripts (headless s
 │   └── RL_ROADMAP.md       # zero→VLA RL learning roadmap (see WHERE TO LOOK)
 ├── models/
 │   └── so101/              # MJCF model — XML + assets/ MUST stay together
+│       ├── AGENTS.md           # model internals (classes, gains, ctrlrange, props)
 │       ├── scene.xml           # entry point; <include>s active calib + scene props (coffee_cup, marshmallow)
-│       ├── so101_new_calib.xml # ACTIVE calib (virtual zero = mid-range); kp=998.22, kv=2.731
-│       ├── so101_old_calib.xml # inactive calib (virtual zero = fully extended); kp=17.8
+│       ├── so101_new_calib.xml # ACTIVE calib (virtual zero = mid-range)
+│       ├── so101_old_calib.xml # inactive calib (virtual zero = fully extended)
 │       ├── joints_properties.xml # ORPHANED + stale — included nowhere; edits have no effect
 │       └── assets/             # 14 .stl: 13 arm meshes + coffee_mug.stl scene prop (meshdir relative)
-└── scripts/
-    ├── sim.py              # headless sinusoidal demo → PNGs + GIF into outputs/
-    └── view.py             # interactive X11 viewer (glfw; --manual / --max-time)
+├── scripts/
+│   ├── sim.py              # headless sinusoidal demo → PNGs + GIF into outputs/
+│   └── view.py             # interactive X11 viewer (glfw; --manual / --max-time)
+└── mira/                   # Gymnasium env package (RL — RL_ROADMAP Phase 1)
+    ├── __init__.py         # registers env id "MIRA/SO101Reach-v0"
+    ├── envs/
+    │   └── so101_reach_env.py  # SO101ReachEnv: reach task over models/so101/scene.xml
+    └── wrappers.py         # NormalizeObservation (Welford), ActionScale
 ```
 
 `outputs/` is gitignored and regenerable — never commit it.
@@ -46,6 +52,7 @@ Contains a MuJoCo (MJCF) model of the SO-101 arm, two Python scripts (headless s
 | Change the model (joints, actuators, meshes) | `models/so101/*.xml` (keep XMLs + `assets/` together) |
 | Switch calibration | `<include file="..." />` line in `models/so101/scene.xml` |
 | Add a scene object (prop) | `models/so101/scene.xml` (`<asset>` + free-joint body; never in the calib XMLs) |
+| Model internals: default classes, gains, ctrlrange, props | `models/so101/AGENTS.md` (child knowledge base) |
 | Change simulation behavior / rendering | `scripts/sim.py` |
 | Change viewer behavior | `scripts/view.py` |
 | Add Python dependencies | `requirements.txt` (keep unpinned `>=`) |
@@ -53,6 +60,8 @@ Contains a MuJoCo (MJCF) model of the SO-101 arm, two Python scripts (headless s
 | Change container entrypoint | `entrypoint.sh` (must NOT export `MUJOCO_GL` — see CONVENTIONS) |
 | Change compose / GPU override | `docker-compose.yaml` / `docker-compose.gpu.yaml` (`mira-arm` service) |
 | Plan RL work / learn RL | `docs/RL_ROADMAP.md` (phases 0–11) |
+| RL: Gymnasium reach env / wrappers | `mira/envs/so101_reach_env.py`, `mira/wrappers.py` (env id `MIRA/SO101Reach-v0`) |
+| RL: how Gymnasium works + usage guide | `docs/GYMNASIUM_ENV.md` |
 
 ## CODE MAP
 
@@ -70,7 +79,7 @@ Contains a MuJoCo (MJCF) model of the SO-101 arm, two Python scripts (headless s
 
 Key constants: `REPO_ROOT`/`MODEL_DIR`/`SCENE_XML` from `Path(__file__).resolve().parent.parent` in both scripts; `RENDER_W/H=640/480`, `FPS_RENDER=30` in `sim.py`.
 
-`models/so101/` — MJCF chain: `scene.xml` `<include>`s the active calibration XML (currently `so101_new_calib.xml`), which **inlines its own `sts3215` defaults**. `joints_properties.xml` is **orphaned** (included nowhere) *and stale* — its `sts3215` class (`kp=17.8`, `kv=0.0`, `forcerange ±3.35`) matches neither calibration, so edits there have no effect. New calib: `kp=998.22`, `kv=2.731`, class `forcerange ±2.94` overridden per-actuator to `±3.35`; old calib: `kp=17.8`. Both define a `backlash` (±0.5°) class that **no element references**. The real calib difference is the joint `range` / actuator `ctrlrange` values — `shoulder_lift` and `elbow_flex` shift most (the old fully-extended zero is asymmetric); `shoulder_pan`/`wrist_flex`/`gripper` are near-identical. `scene.xml` has no `<compiler>` of its own → it inherits `angle="radian" meshdir="assets"` from the included calib XML. Calibration XMLs are onshape-to-robot generated from **different Onshape element IDs** — never deduplicate.
+`models/so101/` — MJCF chain: `scene.xml` `<include>`s the active calibration XML (currently `so101_new_calib.xml`), which **inlines its own `sts3215` defaults**. `joints_properties.xml` is **orphaned** (included nowhere) *and stale*, so edits there have no effect. `scene.xml` has no `<compiler>` of its own → it inherits `angle="radian" meshdir="assets"` from the included calib XML. Full model internals — default classes, gains, per-joint `ctrlrange`, props, Onshape element IDs — live in **`models/so101/AGENTS.md`**.
 
 ## COMMANDS
 
@@ -96,7 +105,7 @@ bash -n entrypoint.sh                                   # entrypoint syntax chec
 - Renderer selection lives in the scripts, not the container: `sim.py` auto-picks EGL (NVIDIA) vs osmesa, `view.py` uses a glfw window when `MUJOCO_GL` is unset. `entrypoint.sh` must **not** export `MUJOCO_GL`, or it would force `view.py` off its window.
 - Compose image/container/service are all named `mira-arm`; `docker-compose.gpu.yaml` is an override, always used with `-f docker-compose.yaml -f docker-compose.gpu.yaml`.
 - Compose env defaults: `DISPLAY=:0`, `MUJOCO_GL=` (empty on purpose so scripts self-select), `XVFB_RUN=0`, `HOST_UID/GID=1000`; `ipc: host`, `shm_size: 2gb`, `memlock: -1` are deliberate MuJoCo/rendering settings — not cruft.
-- The base image intentionally has **no torch/RL deps**; add them only when the roadmap lands.
+- The base image intentionally has **no torch/SB3 deps** — add them via a separate `requirements-rl.txt` when the roadmap lands. `gymnasium` IS a base dep now (the `mira/` env needs it).
 - Paths are derived from `Path(__file__).resolve().parent.parent` (repo root) — scripts work from anywhere.
 - `requirements.txt` is unpinned (`>=`), matching the parent repo convention.
 - `outputs/` is a regenerable artifact directory — delete freely, never commit.
@@ -126,3 +135,4 @@ No lint/typecheck/test targets exist. Smoke test: `python -m py_compile scripts/
 - The base body has visual-only geoms (no `collision` class) — base collision meshes were removed on purpose (bad collision behavior in sim/planning).
 - `.dockerignore` mirrors `.gitignore` (plus `.git`) so `outputs/` and caches never enter the Docker build context.
 - `.omo/` and `.codegraph/` are gitignored agent/editor state — never treat them as sources.
+- `mira/envs/so101_reach_env.py` reads only the **6 arm joints by name**: `scene.xml` adds two free-joint props, so `nq=20`/`nv=18` — never index `qpos[:6]`. Control dt = `model.opt.timestep × frame_skip` (0.002 × 5 = 0.01 s). Reward = `-‖gripperframe − target‖`; success < 2 cm. Gripper action maps to the LeRobot linear convention (`-1`=closed→`0`, `+1`=open→`100`).

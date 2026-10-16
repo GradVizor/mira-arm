@@ -8,6 +8,8 @@ Personal repository for a robotic arm based on the **SO-ARM101 (SO-101)** 6-DOF 
 |---|---|
 | `models/so101/` | MuJoCo (MJCF) model: `scene.xml`, calibration XMLs, `joints_properties.xml`, and `assets/` (13 STL meshes). XML + STL assets must stay together (`meshdir="assets"` is relative). |
 | `scripts/` | `sim.py` (headless sinusoidal demo → PNGs + GIF into `outputs/`) and `view.py` (interactive X11 viewer). |
+| `mira/` | Gymnasium RL package — `SO101ReachEnv` (env id `MIRA/SO101Reach-v0`) + optional observation/action wrappers. See `docs/GYMNASIUM_ENV.md`. |
+| `docs/` | `RL_ROADMAP.md` (zero→VLA learning path) and `GYMNASIUM_ENV.md` (Gymnasium interface + flowcharts). |
 | `Dockerfile` + `entrypoint.sh` + `.dockerignore` | Container image for the sim + viewer (lean `python:3.12-slim`, EGL/osmesa/GLFW rendering libs). |
 | `docker-compose.yaml` / `docker-compose.gpu.yaml` | CPU / NVIDIA-GPU container config; `mira-arm` service (see [Docker](#docker)). |
 | `outputs/` | Generated render artifacts (gitignored, regenerable). |
@@ -66,6 +68,33 @@ python scripts/sim.py                                       # inside the contain
 - The render backend is chosen by the scripts, not the container: `sim.py` picks EGL when an NVIDIA GPU is visible and osmesa elsewhere; `view.py` opens a GLFW window when `MUJOCO_GL` is unset. Set `MUJOCO_GL` to force a backend.
 - `entrypoint.sh` smoke-checks the stack, starts a virtual display when `XVFB_RUN=1`, and keeps bind-mounted files owned by your host user (`HOST_UID`/`HOST_GID`).
 - The interactive viewer inside the container needs a host X server: `xhost +local:root`, then `docker compose exec mira-arm python scripts/view.py`.
+
+## Gymnasium interface (RL)
+
+`mira/` wraps the MuJoCo model in the standard **Gymnasium** API so any RL library can train on the arm without knowing MuJoCo. Gymnasium sits *between* the simulator and a trainer:
+
+```
+models/so101/scene.xml  →  MuJoCo (MjModel/MjData)  →  SO101ReachEnv (Gymnasium)  →  wrappers  →  register "MIRA/SO101Reach-v0"  →  SB3 / CleanRL / eval
+```
+
+```python
+import gymnasium as gym
+import mira  # registers "MIRA/SO101Reach-v0"
+
+env = gym.make("MIRA/SO101Reach-v0")
+obs, info = env.reset(seed=0)
+obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
+env.close()
+```
+
+Run the built-in smoke test (env checker + 10k-step random rollout):
+
+```bash
+pip install -r requirements.txt
+python3 mira/envs/so101_reach_env.py
+```
+
+The full contract, the wrappers, and two annotated flowcharts (where Gymnasium fits, and one episode end-to-end) live in [`docs/GYMNASIUM_ENV.md`](docs/GYMNASIUM_ENV.md). RL deps (torch / Stable-Baselines3) are intentionally **not** in the lean sim image — add them via a separate `requirements-rl.txt` when training.
 
 ## Roadmap
 
