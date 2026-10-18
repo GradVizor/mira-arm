@@ -29,6 +29,10 @@ def _pick_gl(default: str) -> str:
 os.environ["MUJOCO_GL"] = _pick_gl("osmesa")
 
 import mujoco
+try:
+    from mujoco.rendering.classic import renderer as classic_renderer
+except Exception:
+    classic_renderer = None
 import numpy as np
 
 # ---------- constants ----------
@@ -110,7 +114,10 @@ def run(args: argparse.Namespace) -> None:
         gripper_site_id = -1
 
     # Renderer + camera
-    renderer = mujoco.Renderer(model, height=RENDER_H, width=RENDER_W)
+    if hasattr(mujoco, 'Renderer'):
+        renderer = mujoco.Renderer(model, height=RENDER_H, width=RENDER_W)
+    else:
+        renderer = classic_renderer.Renderer(model, height=RENDER_H, width=RENDER_W)
     cam = _setup_camera(model)
 
     # ---- simulation loop ----
