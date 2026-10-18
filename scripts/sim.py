@@ -34,7 +34,7 @@ import numpy as np
 # ---------- constants ----------
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MODEL_DIR = REPO_ROOT / "models" / "so101"
-SCENE_XML = MODEL_DIR / "scene.xml"
+DEFAULT_SCENE_XML = MODEL_DIR / "scene.xml"
 RENDER_W, RENDER_H = 640, 480
 FPS_RENDER = 30  # target render frame rate
 
@@ -78,8 +78,11 @@ def run(args: argparse.Namespace) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     frames_dir = out_dir  # PNGs go directly in out_dir
 
-    print(f"[sim] Loading scene from {SCENE_XML}")
-    model = mujoco.MjModel.from_xml_path(str(SCENE_XML))
+    scene_xml = MODEL_DIR / args.scene
+    if not scene_xml.exists():
+        scene_xml = Path(args.scene)
+    print(f"[sim] Loading scene from {scene_xml}")
+    model = mujoco.MjModel.from_xml_path(str(scene_xml))
     data = mujoco.MjData(model)
     dt = model.opt.timestep
     total_steps = int(args.duration / dt)
@@ -237,6 +240,8 @@ def main() -> None:
                         help="Output directory (default: <repo_root>/outputs)")
     parser.add_argument("--no-gif", action="store_true",
                         help="Skip GIF generation")
+    parser.add_argument("--scene", type=str, default="scene.xml",
+                        help="Scene XML to load (default: scene.xml; use scene_with_coffee_mug.xml for props)")
     args = parser.parse_args()
     run(args)
 

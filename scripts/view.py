@@ -31,9 +31,15 @@ def main() -> None:
                     help="Auto-close after N s (default: run until window closed)")
     ap.add_argument("--manual", action="store_true",
                     help="Do not drive joints; drag them in the left Slider panel")
+    ap.add_argument("--scene", type=str, default="scene.xml",
+                    help="Scene XML to load (default: scene.xml; use scene_with_coffee_mug.xml for props)")
     args = ap.parse_args()
 
-    model = mujoco.MjModel.from_xml_path(str(MODEL_DIR / "scene.xml"))
+    scene_path = MODEL_DIR / args.scene
+    if not scene_path.exists():
+        # Also allow just filename in cwd-relative sense
+        scene_path = Path(args.scene)
+    model = mujoco.MjModel.from_xml_path(str(scene_path))
     data = mujoco.MjData(model)
     ctrl_range = model.actuator_ctrlrange.copy()
 

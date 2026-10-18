@@ -20,14 +20,25 @@ Personal repository for a robotic arm based on the **SO-ARM101 (SO-101)** 6-DOF 
 - **STS3215** servos throughout.
 - Models generated via [onshape-to-robot](https://github.com/Rhoban/onshape-to-robot) from an Onshape CAD design; base collision meshes removed (problematic collision behavior during simulation/planning).
 
+## Scenes
+
+Two scene files are available in `models/so101/`:
+- `scene.xml` — clean arm-only scene (floor, lights, no props). Used by default across scripts and the gym env.
+- `scene_with_coffee_mug.xml` — same arm setup plus a coffee mug and a marshmallow cube (dynamic bodies with freejoints) for pick-and-place experiments.
+
+You can select a scene via CLI flags/env vars:
+- `scripts/view.py --scene scene_with_coffee_mug.xml`
+- `scripts/sim.py --scene scene_with_coffee_mug.xml`
+- `MIRA_SCENE=scene_with_coffee_mug.xml python test/test_gym.py` (or pass `xml_path` to `gym.make`)
+
 ## Calibration
 
-`scene.xml` supports two differently calibrated SO-101 files:
+Both scenes support two differently calibrated SO-101 files:
 
 - **New calibration (default)** — each joint's virtual zero is the **middle** of its joint range → `so101_new_calib.xml`.
 - **Old calibration** — each joint's virtual zero is the configuration where the robot is **fully extended horizontally** → `so101_old_calib.xml`.
 
-Switch by editing the `<include file="..." />` line in `models/so101/scene.xml`.
+Switch by editing the `<include file="..." />` line in the scene XML you want to use.
 
 ## Motor parameters
 
@@ -45,10 +56,12 @@ In LeRobot the gripper is a **linear joint**: `0` = fully closed, `100` = fully 
 
 ```bash
 pip install -r requirements.txt
-python scripts/sim.py                        # headless demo → outputs/ (PNGs + GIF)
+python scripts/sim.py                        # headless demo → outputs/ (PNGs + GIF) — clean scene
+python scripts/sim.py --scene scene_with_coffee_mug.xml  # demo with coffee mug + marshmallow
 python scripts/sim.py --duration 10 --no-gif # 10 s sim, skip GIF
 python scripts/sim.py --out /tmp/out         # custom output dir
-python scripts/view.py                       # interactive X11 viewer (auto demo)
+python scripts/view.py                       # interactive X11 viewer (auto demo) — clean scene
+python scripts/view.py --scene scene_with_coffee_mug.xml  # viewer with props
 python scripts/view.py --manual              # drag sliders in the left panel
 python scripts/view.py --max-time 30         # auto-close after 30 s
 ```
