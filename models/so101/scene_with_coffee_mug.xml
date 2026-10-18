@@ -1,0 +1,94 @@
+<mujoco model="scene">
+    <include file="so101_new_calib.xml" />
+
+    <visual>
+        <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />
+        <rgba haze="0.15 0.25 0.35 1" />
+        <global azimuth="160" elevation="-20" />
+    </visual>
+
+    <asset>
+        <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512"
+            height="3072" />
+        <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4"
+            rgb2="0.1 0.2 0.3"
+            markrgb="0.8 0.8 0.8" width="300" height="300" />
+        <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5"
+            reflectance="0.2" />
+        <material name="marshmallow" rgba="1 1 1 1" specular="0.1" shininess="0.2" />
+        <material name="ceramic_white" rgba="0.95 0.95 0.97 1" specular="0.6" shininess="0.8" />
+        <material name="coffee" rgba="0.25 0.12 0.05 1" specular="0.2" shininess="0.3" />
+        <!-- Mug visual: sleek-blue-mug (100ml) GrabCAD snapshot, baked to
+             meters/Z-up, 8 cm tall, base at local z=0, handle toward +X.
+             Source snapshot dir removed after baking; only this STL stays. -->
+        <mesh file="coffee_mug.stl" />
+    </asset>
+
+    <worldbody>
+        <light pos="0 0 3.5" dir="0 0 -1" directional="true" />
+        <geom name="floor" size="0 0 0.05" pos="0 0 0" type="plane" material="groundplane" />
+
+        <!-- Pick-and-place props: dynamic bodies (freejoint) so the arm can
+             grasp/move them later. Kept in scene_with_coffee_mug.xml (not the calibration
+             XML) so recalibration never touches them. -->
+        <!-- Coffee mug: hollow so the marshmallow can be dropped inside and
+             the jaw can close on the outer wall (graspable).
+             Visuals come from the coffee_mug.stl mesh (contype/conaffinity 0).
+             Contact = a hollow cylindrical shell approximated by a ring of 16
+             thin wall boxes (MuJoCo has no hollow-cylinder primitive and a
+             single hollow mesh would be convexified into a solid cylinder).
+             Body radius ~0.0337 (measured from the mesh after its geom
+             rotation); outer collision faces sit at 0.0335 (~0.2 mm inside the
+             visual) so the gripper meets the real surface without poking
+             through. Bottom disc seals the cavity floor.
+             Origin at the cavity axis on the floor; mesh base at local z=0,
+             mug spans z 0..0.08, handle points +X (away from the arm). -->
+        <body name="coffee_cup" pos="0.20 -0.12 0.0">
+            <freejoint name="coffee_cup_free" />
+            <geom name="cup_visual" type="mesh" mesh="coffee_mug" pos="0 0 0"
+                material="ceramic_white" contype="0" conaffinity="0" />
+            <geom name="cup_bottom" type="cylinder" size="0.0325 0.005" pos="0 0 0.005"
+                material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_00" type="box" size="0.0066 0.0010 0.0340" pos="0.0325 0.0000 0.0440"
+                euler="0 0 1.5708" material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_01" type="box" size="0.0066 0.0010 0.0340" pos="0.0300 0.0124 0.0440"
+                euler="0 0 1.9635" material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_02" type="box" size="0.0066 0.0010 0.0340" pos="0.0230 0.0230 0.0440"
+                euler="0 0 2.3562" material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_03" type="box" size="0.0066 0.0010 0.0340" pos="0.0124 0.0300 0.0440"
+                euler="0 0 2.7489" material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_04" type="box" size="0.0066 0.0010 0.0340" pos="0.0000 0.0325 0.0440"
+                euler="0 0 3.1416" material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_05" type="box" size="0.0066 0.0010 0.0340" pos="-0.0124 0.0300 0.0440"
+                euler="0 0 3.5343" material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_06" type="box" size="0.0066 0.0010 0.0340" pos="-0.0230 0.0230 0.0440"
+                euler="0 0 3.9270" material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_07" type="box" size="0.0066 0.0010 0.0340" pos="-0.0300 0.0124 0.0440"
+                euler="0 0 4.3197" material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_08" type="box" size="0.0066 0.0010 0.0340" pos="-0.0325 0.0000 0.0440"
+                euler="0 0 4.7124" material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_09" type="box" size="0.0066 0.0010 0.0340" pos="-0.0300 -0.0124 0.0440"
+                euler="0 0 5.1051" material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_10" type="box" size="0.0066 0.0010 0.0340" pos="-0.0230 -0.0230 0.0440"
+                euler="0 0 5.4978" material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_11" type="box" size="0.0066 0.0010 0.0340" pos="-0.0124 -0.0300 0.0440"
+                euler="0 0 5.8905" material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_12" type="box" size="0.0066 0.0010 0.0340" pos="-0.0000 -0.0325 0.0440"
+                euler="0 0 6.2832" material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_13" type="box" size="0.0066 0.0010 0.0340" pos="0.0124 -0.0300 0.0440"
+                euler="0 0 6.6759" material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_14" type="box" size="0.0066 0.0010 0.0340" pos="0.0230 -0.0230 0.0440"
+                euler="0 0 7.0686" material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+            <geom name="cup_wall_15" type="box" size="0.0066 0.0010 0.0340" pos="0.0300 -0.0124 0.0440"
+                euler="0 0 7.4613" material="ceramic_white" density="800" friction="0.8 0.1 0.1" />
+        </body>
+
+        <!-- Marshmallow cube: 2.5 cm light box, graspable by the SO-101 jaw -->
+        <body name="marshmallow" pos="0.16 0.11 0.0125">
+            <freejoint name="marshmallow_free" />
+            <geom name="marshmallow_geom" type="box" size="0.0125 0.0125 0.0125"
+                material="marshmallow" density="300" friction="0.9 0.1 0.1" />
+            <site name="marshmallow_site" pos="0 0 0" size="0.004" />
+        </body>
+    </worldbody>
+</mujoco>
