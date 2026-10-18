@@ -4,15 +4,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-# Problem: Original script created a NEW model and data from scene.xml
-# (mujoco.MjModel.from_xml_path + mujoco.MjData), so env.step() updated
-# env.data but the viewer showed a different, unrelated data instance.
-# As a result, you couldn't see the gym inference - the viewer didn't reflect
-# the actions taken by env.step().
-#
-# Fix: Use the gym environment's model and data (env.unwrapped.model / env.unwrapped.data)
-# so the viewer shows exactly what the gym policy/actions produce. Also set
-# MUJOCO_GL to 'osmesa' as a safe fallback for headless environments.
 import os
 os.environ.setdefault("MUJOCO_GL", "osmesa")
 
