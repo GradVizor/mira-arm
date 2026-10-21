@@ -1,0 +1,22 @@
+# MIRA arm — reinforcement learning deps (install ON TOP of requirements.txt)
+# Keeps the lean sim image free of torch (see README / RL_ROADMAP convention).
+#
+#   pip install -r requirements.txt -r requirements-rl.txt
+#
+# Covers the RL_ROADMAP trainers: PPO / A2C / SAC / TD3 / DDPG / DQN (SB3),
+# HER replay buffer (sb3_contrib), and TensorBoard logging.
+
+# Deep-learning backend (SB3 dependency — listed explicitly for a pinned-later setup)
+torch>=2.0
+
+# Stable-Baselines3 — PPO, A2C, SAC, TD3, DDPG, DQN, HerReplayBuffer
+stable_baselines3[extra]>=2.3
+
+# Extra SB3 contrib algorithms (TQC, TRPO, ARS, CEM-RL)
+sb3_contrib>=2.3
+
+# Logging / experiment tracking (SB3 TensorBoardLogger)
+tensorboard>=2.14
+
+# Plotting training curves / eval returns
+matplotlib>=3.7
