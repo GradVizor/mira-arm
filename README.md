@@ -7,9 +7,10 @@ Personal repository for a robotic arm based on the **SO-ARM101 (SO-101)** 6-DOF 
 | Path | Contents |
 |---|---|
 | `models/so101/` | MuJoCo (MJCF) model: `scene.xml`, calibration XMLs, `joints_properties.xml`, and `assets/` (13 STL meshes). XML + STL assets must stay together (`meshdir="assets"` is relative). |
-| `scripts/` | `sim.py` (headless sinusoidal demo → PNGs + GIF into `outputs/`) and `view.py` (interactive X11 viewer). |
-| `mira/` | Gymnasium RL package — `SO101ReachEnv` (env id `MIRA/SO101Reach-v0`) + optional observation/action wrappers. See `docs/GYMNASIUM_ENV.md`. |
-| `docs/` | `RL_ROADMAP.md` (zero→VLA learning path) and `GYMNASIUM_ENV.md` (Gymnasium interface + flowcharts). |
+| `scripts/` | `sim.py` (headless sinusoidal demo → PNGs + GIF into `outputs/`), `view.py` (interactive X11 viewer), `watch_gym.py` (MuJoCo viewer driven by the Gym env), `train_reach.py` (PPO stub), `train_tabular.py` (Phase 2 tabular Q-learning / SARSA CLI). |
+| `mira/` | Gymnasium RL package — `SO101ReachEnv` (env id `MIRA/SO101Reach-v0`) + optional observation/action wrappers. See `docs/GYMNASIUM_ENV.md`. `mira/rl/` holds the from-scratch tabular TD learners (numpy only). |
+| `docs/` | `RL_ROADMAP.md` (zero→VLA learning path), `GYMNASIUM_ENV.md` (Gymnasium interface + flowcharts), `TABULAR_RL.md` (TD-learning study guide). |
+| `test/` | Script-style self-checks: `test_gym.py` (env smoke test) and `test_tabular_rl.py` (13 checks for the Phase 2 learners). No pytest needed. |
 | `Dockerfile` + `entrypoint.sh` + `.dockerignore` | Container image for the sim + viewer (lean `python:3.12-slim`, EGL/osmesa/GLFW rendering libs). |
 | `docker-compose.yaml` / `docker-compose.gpu.yaml` | CPU / NVIDIA-GPU container config; `mira-arm` service (see [Docker](#docker)). |
 | `outputs/` | Generated render artifacts (gitignored, regenerable). |
@@ -109,6 +110,31 @@ python3 mira/envs/so101_reach_env.py
 
 The full contract, the wrappers, and two annotated flowcharts (where Gymnasium fits, and one episode end-to-end) live in [`docs/GYMNASIUM_ENV.md`](docs/GYMNASIUM_ENV.md). RL deps (torch / Stable-Baselines3) are intentionally **not** in the lean sim image — add them via a separate `requirements-rl.txt` when training.
 
+## Tabular RL (Phase 2)
+
+`mira/rl/tabular.py` is a **from-scratch** Q-learning + SARSA implementation — plain numpy and the
+Gymnasium API, no RL library. It exists to make the TD-learning mechanics concrete before a neural
+policy ever touches the arm.
+
+```bash
+python scripts/train_tabular.py --env FrozenLake-v1 --compare-optimal   # + exact value-iteration reference
+python scripts/train_tabular.py --env CliffWalking-v1 --algo sarsa      # on-policy variant
+python scripts/train_tabular.py --env FrozenLake-v1 --seeds 0 1 2        # multi-seed
+python test/test_tabular_rl.py                                          # 13 self-checks
+```
+
+- **Q-learning (off-policy)** on `CliffWalking-v1` finds the 13-step optimal path (−13, 100%).
+- **SARSA (on-policy)** takes the safe 17-step route (−17, 100%) — it learns the risk it actually
+  faces while exploring.
+- On slippery `FrozenLake-v1` the ceiling for *any* deterministic policy is **0.733**; the shipped
+  defaults reach 0.716–0.730 across seeds, and `--compare-optimal` proves the ceiling by solving the
+  MDP exactly.
+- The same code shows why tabular RL cannot scale to the arm: a 6-joint discretisation at 100
+  bins/joint is 10¹² states (≈ 48 TB of Q-table). The script prints that arithmetic.
+
+The theory, the derivations, the checkpoint answers, and the lab notebook live in
+[`docs/TABULAR_RL.md`](docs/TABULAR_RL.md).
+
 ## Roadmap
 
 - Teleop data collection
@@ -120,5 +146,7 @@ The full contract, the wrappers, and two annotated flowcharts (where Gymnasium f
 
 ```bash
 python -m py_compile scripts/sim.py scripts/view.py
-python scripts/sim.py   # must complete with non-blank frames (mid-frame mean pixel check)
+python scripts/sim.py           # must complete with non-blank frames (mid-frame mean pixel check)
+python test/test_gym.py         # Gymnasium env smoke test
+python test/test_tabular_rl.py  # Phase 2 self-checks (13 checks)
 ```
