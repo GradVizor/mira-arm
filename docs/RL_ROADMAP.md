@@ -72,6 +72,11 @@ mira/wrappers.py               # action scaling [-1,1] → ctrlrange, obs normal
 
 **Checkpoint** — explain TD learning and articulate why it cannot scale to a 6-DOF arm.
 
+**Status (this repo)** — done. The write-up and findings live in [`TABULAR_RL.md`](TABULAR_RL.md).
+The learner/CLI/tests were archived after completion (`git show 8174a96`) — a Q-table cannot
+represent this arm, so they were unreachable from the training path. They were not deleted as a
+correction; read them before Phase 3 if you want the reference implementation to diff against.
+
 **Resources** — Sutton & Barto ch. 6; Denny Britz RL repo.
 
 ---

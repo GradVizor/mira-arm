@@ -4,7 +4,7 @@
 **Commit:** d33014e
 **Branch:** main
 
-MJCF model of the SO-101 arm: 4 XMLs + `assets/` (14 STL). `assets/` MUST stay beside the XMLs (`meshdir` / `<include>` are directory-relative). Cross-cutting rules live in `../AGENTS.md` — this file owns model internals only.
+MJCF model of the SO-101 arm: 5 XMLs + `assets/` (14 STL). `assets/` MUST stay beside the XMLs (`meshdir` / `<include>` are directory-relative). Cross-cutting rules live in `../AGENTS.md` — this file owns model internals only.
 
 ## FILE ROLES
 
@@ -13,7 +13,7 @@ MJCF model of the SO-101 arm: 4 XMLs + `assets/` (14 STL). `assets/` MUST stay b
 | `scene.xml` | entry point | `<include>`s the active calib; adds `visual`/`asset`/floor/props; has **no `<compiler>`** of its own |
 | `so101_new_calib.xml` | via `scene.xml` (ACTIVE) | virtual zero = **mid-range** of each joint |
 | `so101_old_calib.xml` | not included (inactive) | virtual zero = **fully-extended horizontal** |
-| `joints_properties.xml` | **nowhere (ORPHANED + stale)** | edits have NO effect — never rely on it |
+| `scene_with_coffee_mug.xml` / `scene_with_markers.xml` | standalone entry points | prop / marker scene variants, each `<include>`s `so101_new_calib.xml` |
 
 ## MJCF CHAIN
 
@@ -23,7 +23,7 @@ MJCF model of the SO-101 arm: 4 XMLs + `assets/` (14 STL). `assets/` MUST stay b
 
 - Per-calib root class (`so101_new_calib` / `so101_old_calib`): base `joint damping/frictionloss/armature` + `position kp="50"`, with sub-classes `visual` (mesh geom, `contype=0 conaffinity=0 group=2`) and `collision` (`group=3`). Bodies set `childclass`.
 - `sts3215`: used by **all 6 joints + all 6 actuators**. Overrides joint dynamics and position gains (the base `kp="50"` is effectively never used).
-- `backlash` (±0.5°): defined in both calibs **and** the orphan but **referenced by no element** — inert.
+- `backlash` (±0.5°): defined in both calibs but **referenced by no element** — inert.
 - Each `<actuator>` overrides `forcerange` to `±3.35` and sets `ctrlrange` per joint — this override, not the class, is the real calibration.
 
 ## GAINS
@@ -33,7 +33,6 @@ MJCF model of the SO-101 arm: 4 XMLs + `assets/` (14 STL). `assets/` MUST stay b
 | new calib `sts3215` class | 998.22 | 2.731 | ±2.94 |
 | new calib actuators (override) | — | — | ±3.35 |
 | old calib `sts3215` class | 17.8 | — | — |
-| `joints_properties.xml` (orphan) | 17.8 | 0.0 | ±3.35 |
 
 `kp=998.22` assumes servo proportional gain 16 (per RBE501-RL-arm-project). New-calib joint dynamics: `damping=0.60 frictionloss=0.052 armature=0.028`.
 

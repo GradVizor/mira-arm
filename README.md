@@ -6,11 +6,11 @@ Personal repository for a robotic arm based on the **SO-ARM101 (SO-101)** 6-DOF 
 
 | Path | Contents |
 |---|---|
-| `models/so101/` | MuJoCo (MJCF) model: `scene.xml`, calibration XMLs, `joints_properties.xml`, and `assets/` (13 STL meshes). XML + STL assets must stay together (`meshdir="assets"` is relative). |
-| `scripts/` | `sim.py` (headless sinusoidal demo → PNGs + GIF into `outputs/`), `view.py` (interactive X11 viewer), `watch_gym.py` (MuJoCo viewer driven by the Gym env), `train_reach.py` (PPO stub), `train_tabular.py` (Phase 2 tabular Q-learning / SARSA CLI). |
-| `mira/` | Gymnasium RL package — `SO101ReachEnv` (env id `MIRA/SO101Reach-v0`) + optional observation/action wrappers. See `docs/GYMNASIUM_ENV.md`. `mira/rl/` holds the from-scratch tabular TD learners (numpy only). |
-| `docs/` | `RL_ROADMAP.md` (zero→VLA learning path), `GYMNASIUM_ENV.md` (Gymnasium interface + flowcharts), `TABULAR_RL.md` (TD-learning study guide). |
-| `test/` | Script-style self-checks: `test_gym.py` (env smoke test) and `test_tabular_rl.py` (13 checks for the Phase 2 learners). No pytest needed. |
+| `models/so101/` | MuJoCo (MJCF) model: `scene.xml`, calibration XMLs, and `assets/` (13 STL meshes). XML + STL assets must stay together (`meshdir="assets"` is relative). |
+| `scripts/` | `sim.py` (headless sinusoidal demo → PNGs + GIF into `outputs/`), `view.py` (interactive X11 viewer), `watch_gym.py` (MuJoCo viewer driven by the Gym env). |
+| `mira/` | Gymnasium RL package — `SO101ReachEnv` (env id `MIRA/SO101Reach-v0`) + optional observation/action wrappers. See `docs/GYMNASIUM_ENV.md`. |
+| `docs/` | `RL_ROADMAP.md` (zero→VLA learning path), `GYMNASIUM_ENV.md` (Gymnasium interface + flowcharts), `TABULAR_RL.md` (TD-learning study guide, Phase 2 write-up). |
+| `test/` | Script-style self-checks: `test_gym.py` (env smoke test). No pytest needed. |
 | `Dockerfile` + `entrypoint.sh` + `.dockerignore` | Container image for the sim + viewer (lean `python:3.12-slim`, EGL/osmesa/GLFW rendering libs). |
 | `docker-compose.yaml` / `docker-compose.gpu.yaml` | CPU / NVIDIA-GPU container config; `mira-arm` service (see [Docker](#docker)). |
 | `outputs/` | Generated render artifacts (gitignored, regenerable). |
@@ -47,7 +47,6 @@ STS3215 position servos, motor properties adapted from the [Open Duck Mini proje
 
 - **Active model (`so101_new_calib.xml`)** — `kp=998.22`, `kv=2.731` (gains per the [RBE501 RL-arm project](https://github.com/Gregory119/RBE501-RL-arm-project), assuming servo proportional gain 16); joint `damping=0.60`, `frictionloss=0.052`, `armature=0.028`. The `sts3215` class default `forcerange` is ±2.94, but every actuator overrides it to `-3.35 3.35` (also its `ctrlrange`).
 - **Old calibration (`so101_old_calib.xml`)** — `kp=17.8`.
-- `joints_properties.xml` ships the `kp=17.8` `sts3215` + `backlash` (±0.5°) classes but is **not** `<include>`d anywhere — the calibration XMLs inline their own copies.
 
 ## Gripper note
 
@@ -110,30 +109,21 @@ python3 mira/envs/so101_reach_env.py
 
 The full contract, the wrappers, and two annotated flowcharts (where Gymnasium fits, and one episode end-to-end) live in [`docs/GYMNASIUM_ENV.md`](docs/GYMNASIUM_ENV.md). RL deps (torch / Stable-Baselines3) are intentionally **not** in the lean sim image — add them via a separate `requirements-rl.txt` when training.
 
-## Tabular RL (Phase 2)
+## Tabular RL (Phase 2 — archived)
 
-`mira/rl/tabular.py` is a **from-scratch** Q-learning + SARSA implementation — plain numpy and the
-Gymnasium API, no RL library. It exists to make the TD-learning mechanics concrete before a neural
-policy ever touches the arm.
+Phase 2 is complete. The from-scratch Q-learning + SARSA code that carried it (tabular learner,
+CLI, 13 self-checks) has been removed: a Q-table is structurally incapable of representing this
+arm (6 joints at 100 bins = 10¹² states ≈ 48 TB), so none of it was reachable from the training
+path. Recover it from git history (`git show 8174a96`) if you want the reference implementation.
 
-```bash
-python scripts/train_tabular.py --env FrozenLake-v1 --compare-optimal   # + exact value-iteration reference
-python scripts/train_tabular.py --env CliffWalking-v1 --algo sarsa      # on-policy variant
-python scripts/train_tabular.py --env FrozenLake-v1 --seeds 0 1 2        # multi-seed
-python test/test_tabular_rl.py                                          # 13 self-checks
-```
+The write-up is kept — it is the part that transfers:
 
-- **Q-learning (off-policy)** on `CliffWalking-v1` finds the 13-step optimal path (−13, 100%).
-- **SARSA (on-policy)** takes the safe 17-step route (−17, 100%) — it learns the risk it actually
-  faces while exploring.
-- On slippery `FrozenLake-v1` the ceiling for *any* deterministic policy is **0.733**; the shipped
-  defaults reach 0.716–0.730 across seeds, and `--compare-optimal` proves the ceiling by solving the
-  MDP exactly.
-- The same code shows why tabular RL cannot scale to the arm: a 6-joint discretisation at 100
-  bins/joint is 10¹² states (≈ 48 TB of Q-table). The script prints that arithmetic.
+- **Q-learning (off-policy)** on `CliffWalking-v1` finds the 13-step optimal path (−13).
+- **SARSA (on-policy)** takes the safe 17-step route (−17) — it learns the risk it actually faces.
+- On slippery `FrozenLake-v1` the ceiling for *any* deterministic policy is **0.733**; tuning
+  landed at 0.716–0.730 across seeds.
 
-The theory, the derivations, the checkpoint answers, and the lab notebook live in
-[`docs/TABULAR_RL.md`](docs/TABULAR_RL.md).
+Derivations, checkpoint answers, and the lab notebook: [`docs/TABULAR_RL.md`](docs/TABULAR_RL.md).
 
 ## Roadmap
 
@@ -148,5 +138,4 @@ The theory, the derivations, the checkpoint answers, and the lab notebook live i
 python -m py_compile scripts/sim.py scripts/view.py
 python scripts/sim.py           # must complete with non-blank frames (mid-frame mean pixel check)
 python test/test_gym.py         # Gymnasium env smoke test
-python test/test_tabular_rl.py  # Phase 2 self-checks (13 checks)
 ```

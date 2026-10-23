@@ -3,18 +3,12 @@
 **RL_ROADMAP Phase 2.** This is the one phase that is *not* about the robot. It exists to make
 temporal-difference (TD) learning concrete before function approximation makes the maths fuzzy.
 
-| Artifact | What it is |
-|---|---|
-| `mira/rl/tabular.py` | The learner, written from scratch (no SB3, no Gymnasium RL helpers) |
-| `scripts/train_tabular.py` | CLI: train, evaluate, render the learned policy, compare against the exact optimum |
-| `test/test_tabular_rl.py` | 13 self-checks (`python test/test_tabular_rl.py`) |
-
-```bash
-python scripts/train_tabular.py --env FrozenLake-v1 --compare-optimal
-python scripts/train_tabular.py --env CliffWalking-v1 --algo q_learning
-python scripts/train_tabular.py --env CliffWalking-v1 --algo sarsa
-python test/test_tabular_rl.py
-```
+> **Code archived.** Phase 2 is complete and the code that carried it (`mira/rl/tabular.py`,
+> `scripts/train_tabular.py`, `test/test_tabular_rl.py`) has been removed from the repo: a Q-table
+> cannot represent a 6-DOF continuous arm, so none of it was reachable from the training path.
+> Recover it with `git show 8174a96` when you want the runnable reference — the CLI examples below
+> refer to that archived code and will not run on the current tree. This document is kept because
+> the theory is the part that transfers to DQN/PPO.
 
 ---
 
@@ -88,8 +82,8 @@ Three things to internalise:
 
 ### The whole algorithm, in ~50 lines
 
-This is the condensed version; `mira/rl/tabular.py` is the same thing with types, docstrings and
-telemetry.
+This is the condensed version; the archived `mira/rl/tabular.py` (`git show 8174a96`) was the same
+thing with types, docstrings and telemetry.
 
 ```python
 def q_learning(env, episodes=50_000, alpha=0.1, gamma=0.95, epsilon_start=1.0,
@@ -144,12 +138,8 @@ next action. The "next action" is the whole difference.
 
 ### The cliff-walking evidence
 
-Run both on `CliffWalking-v1` and compare the greedy policies:
-
-```bash
-python scripts/train_tabular.py --env CliffWalking-v1 --algo q_learning
-python scripts/train_tabular.py --env CliffWalking-v1 --algo sarsa
-```
+Run both on `CliffWalking-v1` and compare the greedy policies (archived CLI, `git show 8174a96`):
+`--algo q_learning` vs `--algo sarsa`.
 
 **Q-learning** — 13 steps, return −13 (the *optimal* path, hugging the cliff):
 
@@ -190,12 +180,9 @@ All numbers below are reproducible with the commands shown; every run is seeded.
 ### FrozenLake-v1 (slippery 4×4)
 
 The environment is stochastic: every intended move has a 1/3 chance of slipping sideways, and three
-of the sixteen cells are holes. That puts a hard ceiling on any *deterministic* policy. The script
-solves the MDP exactly with value iteration to measure that ceiling:
-
-```bash
-python scripts/train_tabular.py --env FrozenLake-v1 --compare-optimal
-```
+of the sixteen cells are holes. That puts a hard ceiling on any *deterministic* policy. The archived
+CLI solved the MDP exactly with value iteration (`--compare-optimal`, `git show 8174a96`) to measure
+that ceiling:
 
 * The **optimal deterministic policy reaches 0.733 success**. Q-learning with 50k episodes
   recovers a policy with a success rate of ≈ 0.72 on *every* seed tried, and on good seeds the
@@ -271,8 +258,8 @@ discretising each joint into 100 bins:
 The table would not fit in RAM, let alone be learned from samples. And 100 bins is already far too
 coarse: it resolves each joint to ~1°, while the reward is a function of the *continuous*
 end-effector position — a 1 cm success threshold is far below the bin width, so the discretised
-reward is not even the reward of the task. Compute the numbers yourself with
-`mira.rl.tabular.state_space_size(n_joints, bins_per_joint)`.
+reward is not even the reward of the task. The archived learner computed this as `bins ** n_joints`
+(`state_space_size`, `git show 8174a96`) — that one function was the whole Phase 2 checkpoint.
 
 **2. The action space is continuous.** A tabular agent stores one number per (state, action) pair,
 which requires a *finite* action set. MIRA's action is a 6-dimensional continuous vector of joint
@@ -321,5 +308,7 @@ where you can see every single number in the table and check it against the exac
 ## 7. Where to go next
 
 Phase 3 replaces the table with a network: DQN on CartPole, then the deliberate failure —
-discretise one MIRA joint and watch the state space explode. `mira/rl/tabular.py` is deliberately
-small and readable so it can serve as the reference implementation you diff against.
+discretise one MIRA joint and watch the state space explode. Keep the archived learner
+(`git show 8174a96`) as the reference implementation you diff your neural Q-function against: when
+the DQN loss diverges, the 15-line `update()` that provably works is the fastest debugging aid you
+have.
