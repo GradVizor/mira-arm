@@ -40,13 +40,20 @@ Contains a MuJoCo (MJCF) model of the SO-101 arm, Python scripts (headless sim, 
 ├── scripts/
 │   ├── sim.py              # headless sinusoidal demo → PNGs + GIF into outputs/
 │   ├── view.py             # interactive X11 viewer (glfw; --manual / --max-time)
-│   └── watch_gym.py        # MuJoCo viewer driven by the Gymnasium env
+│   ├── watch_gym.py        # MuJoCo viewer driven by the Gymnasium env
+│   ├── train_point_to_point.py  # PPO trainer for MIRA/SO101PointToPoint-v0
+│   ├── train_pick_place.py      # SAC + 4-stage curriculum for MIRA/SO101PickPlace-v0
+│   ├── watch_point_to_point.py  # checkpoint viewer/eval
+│   └── test_grasp.py       # Step 0 grasp-physics test (exit 0=PASS, 1=FAIL)
 ├── test/
 │   └── test_gym.py         # script-style smoke test of MIRA/SO101Reach-v0
 └── mira/                   # Gymnasium env package (RL — RL_ROADMAP Phase 1)
-    ├── __init__.py         # registers env id "MIRA/SO101Reach-v0"
+    ├── __init__.py         # registers MIRA/SO101Reach-v0, PointToPoint-v0, PickPlace-v0
     ├── envs/
-    │   └── so101_reach_env.py  # SO101ReachEnv: reach task over models/so101/scene.xml
+    │   ├── so101_reach_env.py        # SO101ReachEnv: reach over models/so101/scene.xml
+    │   ├── so101_point_to_point_env.py  # point-to-point reach env
+    │   └── so101_pick_place_env.py   # SO101PickPlaceEnv: marshmallow → cup
+    ├── pick_place_model.py # runtime flat gripper pads + force cap (MjSpec)
     └── wrappers.py         # NormalizeObservation (Welford), ActionScale
 ```
 
@@ -69,6 +76,11 @@ Contains a MuJoCo (MJCF) model of the SO-101 arm, Python scripts (headless sim, 
 | Change compose / GPU override | `docker-compose.yaml` / `docker-compose.gpu.yaml` (`mira-arm` service) |
 | Plan RL work / learn RL | `docs/RL_ROADMAP.md` (phases 0–11) |
 | RL: Gymnasium reach env / wrappers | `mira/envs/so101_reach_env.py`, `mira/wrappers.py` (env id `MIRA/SO101Reach-v0`) |
+| RL: point-to-point env + training | `mira/envs/so101_point_to_point_env.py`, `scripts/train_point_to_point.py` |
+| RL: pick-and-place plan | `docs/PICK_PLACE_PLAN.md` |
+| RL: pick-and-place env | `mira/envs/so101_pick_place_env.py` (env id `MIRA/SO101PickPlace-v0`) |
+| RL: pick-and-place SAC/curriculum trainer | `scripts/train_pick_place.py` |
+| RL: grasp physics / pads | `mira/pick_place_model.py`, `scripts/test_grasp.py` |
 | RL: how Gymnasium works + usage guide | `docs/GYMNASIUM_ENV.md` |
 | RL: TD-learning theory + Phase 2 findings | `docs/TABULAR_RL.md` (write-up only — the tabular code was archived) |
 
@@ -100,6 +112,13 @@ python scripts/view.py --manual  # drag sliders in the left panel
 python -m py_compile scripts/sim.py scripts/view.py   # syntax smoke test
 
 python test/test_gym.py                              # Gymnasium env smoke test
+python3 scripts/test_grasp.py                         # Step 0 grasp test (exit 0=PASS, 1=FAIL)
+python3 scripts/test_grasp.py --viewer                # live grasp playback (needs DISPLAY)
+python3 scripts/oracle_pick_place.py                  # scripted full task (exit 0=PASS, headless)
+python3 scripts/oracle_pick_place.py --viewer         # same, live MuJoCo window (needs DISPLAY)
+python3 -m mira.envs.so101_pick_place_env             # pick-and-place env checker + rollouts
+python3 scripts/train_pick_place.py --stage 1 --total-timesteps 200000
+python3 scripts/train_pick_place.py --curriculum --stage-timesteps 100000
 
 docker compose up -d                                    # CPU container → bash shell
 docker compose -f docker-compose.yaml -f docker-compose.gpu.yaml up -d   # NVIDIA GPU host
@@ -131,7 +150,7 @@ bash -n entrypoint.sh                                   # entrypoint syntax chec
 
 ## VERIFICATION
 
-No lint/typecheck/CI targets exist; the self-checks are scripts. Smoke test: `python -m py_compile scripts/sim.py scripts/view.py` passes, `bash -n entrypoint.sh` passes, `docker compose config` validates both compose files, and `python scripts/sim.py` completes with non-blank frames (the script's own mid-frame mean-pixel check reports `non-blank`). RL self-check: `python test/test_gym.py`.
+No lint/typecheck/CI targets exist; the self-checks are scripts. Smoke test: `python -m py_compile scripts/sim.py scripts/view.py` passes, `bash -n entrypoint.sh` passes, `docker compose config` validates both compose files, and `python scripts/sim.py` completes with non-blank frames (the script's own mid-frame mean-pixel check reports `non-blank`). RL self-check: `python test/test_gym.py`. Pick-and-place self-checks: `python3 scripts/test_grasp.py` (PASS 3/3), `gymnasium.utils.env_checker.check_env` on `MIRA/SO101PickPlace-v0`, and a short SAC smoke run via `scripts/train_pick_place.py --stage 1 --total-timesteps 256`.
 
 ## NOTES
 
@@ -146,4 +165,7 @@ No lint/typecheck/CI targets exist; the self-checks are scripts. Smoke test: `py
 - `.dockerignore` mirrors `.gitignore` (plus `.git`) so `outputs/` and caches never enter the Docker build context.
 - `.omo/` and `.codegraph/` are gitignored agent/editor state — never treat them as sources.
 - `mira/envs/so101_reach_env.py` reads only the **6 arm joints by name**: `scene.xml` adds two free-joint props, so `nq=20`/`nv=18` — never index `qpos[:6]`. Control dt = `model.opt.timestep × frame_skip` (0.002 × 5 = 0.01 s). Reward = `-‖gripperframe − target‖`; success < 2 cm. Gripper action maps to the LeRobot linear convention (`-1`=closed→`0`, `+1`=open→`100`).
+- `mira/pick_place_model.py` builds flat gripper pads at runtime with `MjSpec` and disables the original tapered finger-mesh collisions. Do not hand-edit `so101_new_calib.xml`; pads + `force_limit=0.5` are what make the 4.7 g marshmallow graspable. The 3.35 N·m stock limit ejects it.
+- 5-DOF grasp constraint: position + world-down + yaw is overconstrained. The natural grasp yaw at the marshmallow target is ~40.87°; align the box yaw (or randomize ±6° around it). The stock finger mesh cannot grasp an axis-aligned box top-down.
+- `scripts/test_grasp.py` is the Step 0 acceptance test (exit 0=PASS, 1=FAIL); it does not involve the cup. `SO101PickPlaceEnv` is the Step 1/2 env: 21-dim state obs, 6-dim action, success `xy < 2 cm` + `0.01 < z < 0.06` + cup upright. It also has cup-pinning (`fix_cup`), workspace/cup-tip failure termination, and curriculum flags (`randomize_box`, `randomize_box_pos`, `randomize_cup_pos`, `randomize_physics`). `scripts/train_pick_place.py` trains SAC with `NormalizeObservation` and the four-stage curriculum; it saves `final_model.zip`, `norm_stats.npz`, checkpoints, and `summary.json` per stage under `outputs/sac_pick_place/` by default.
 - Phase 2 (tabular TD) is **complete and archived** — the learner/CLI/tests were deleted once the arm path moved to function approximation. Its findings (`FrozenLake` 0.733 ceiling, `CliffWalking` 13-step Q-learning vs 17-step SARSA, one-seed-is-noise) are preserved in `docs/TABULAR_RL.md`; recover the code with `git show 8174a96`.
