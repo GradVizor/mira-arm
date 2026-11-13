@@ -7,8 +7,8 @@ Personal repository for a robotic arm based on the **SO-ARM101 (SO-101)** 6-DOF 
 | Path | Contents |
 |---|---|
 | `models/so101/` | MuJoCo (MJCF) model: `scene.xml`, calibration XMLs, and `assets/` (13 STL meshes). XML + STL assets must stay together (`meshdir="assets"` is relative). |
-| `scripts/` | `sim.py` (headless sinusoidal demo → PNGs + GIF into `outputs/`), `view.py` (interactive X11 viewer), `watch_gym.py` (MuJoCo viewer driven by the Gym env). |
-| `mira/` | Gymnasium RL package — `SO101ReachEnv` (env id `MIRA/SO101Reach-v0`) + optional observation/action wrappers. See `docs/GYMNASIUM_ENV.md`. |
+| `scripts/` | `sim.py` (headless sinusoidal demo), `view.py` (interactive X11 viewer), `watch_gym.py` (MuJoCo viewer driven by the Gym env), `train_pick_place.py` (SAC pick-and-place trainer), `oracle_pick_place.py` (scripted IK oracle), `watch_pick_place.py` (MuJoCo viewer for trained pick-and-place model), `test_grasp.py` (grasp-physics acceptance test). |
+| `mira/` | Gymnasium RL package — `SO101ReachEnv` (`MIRA/SO101Reach-v0`), `SO101PointToPointEnv` (`MIRA/SO101PointToPoint-v0`), `SO101PickPlaceEnv` (`MIRA/SO101PickPlace-v0`) + observation/action wrappers. See `docs/GYMNASIUM_ENV.md`. |
 | `docs/` | `RL_ROADMAP.md` (zero→VLA learning path), `GYMNASIUM_ENV.md` (Gymnasium interface + flowcharts), `TABULAR_RL.md` (TD-learning study guide, Phase 2 write-up). |
 | `test/` | Script-style self-checks: `test_gym.py` (env smoke test). No pytest needed. |
 | `Dockerfile` + `entrypoint.sh` + `.dockerignore` | Container image for the sim + viewer (lean `python:3.12-slim`, EGL/osmesa/GLFW rendering libs). |
@@ -108,6 +108,32 @@ python3 mira/envs/so101_reach_env.py
 ```
 
 The full contract, the wrappers, and two annotated flowcharts (where Gymnasium fits, and one episode end-to-end) live in [`docs/GYMNASIUM_ENV.md`](docs/GYMNASIUM_ENV.md). RL deps (torch / Stable-Baselines3) are intentionally **not** in the lean sim image — add them via a separate `requirements-rl.txt` when training.
+
+## Pick and place (SO-101)
+
+The `MIRA/SO101PickPlace-v0` env tasks the arm with grasping a marshmallow cube and dropping it into a coffee cup. It uses flat gripper pads (built at runtime via `MjSpec`) with a reduced force limit (0.5 N·m vs the stock 3.35 N·m) to make the 4.7 g marshmallow graspable.
+
+```bash
+# Validate grasp physics (exit 0 = PASS)
+python3 scripts/test_grasp.py
+
+# Scripted oracle (exit 0 = task solvable)
+python3 scripts/oracle_pick_place.py
+python3 scripts/oracle_pick_place.py --viewer   # live window
+
+# Train (lift-only bootstrap, then full task)
+python3 scripts/train_pick_place.py --task-mode lift_only --stage 1 --total-timesteps 10000 --warm-start --pregrasp-height 0.0
+python3 scripts/train_pick_place.py --task-mode full --stage 1 --total-timesteps 10000 --warm-start --pregrasp-height 0.0 --init-model outputs/sac_pick_place/stage1/final_model.zip
+
+# Watch a trained model
+python3 scripts/watch_pick_place.py
+python3 scripts/watch_pick_place.py --task-mode full
+```
+
+Key findings (see `docs/PICK_PLACE_DEBUG_LOG.md`):
+- Grasp requires the natural grasp yaw (~40.87°); an axis-aligned box cannot be grasped top-down with the stock finger mesh.
+- Closure potential must be gated on pad proximity; entropy collapse is the main failure mode.
+- Lift shaping (velocity-based, gated on held contact) is needed to avoid pushing the box.
 
 ## Tabular RL (Phase 2 — archived)
 
