@@ -4,6 +4,7 @@ import gymnasium.envs.registration as registration
 
 from mira.envs.so101_reach_env import SO101ReachEnv
 from mira.envs.so101_point_to_point_env import SO101PointToPointEnv
+from mira.envs.so101_pick_place_env import SO101PickPlaceEnv
 
 # Idempotent: re-importing the package is cached, and gymnasium overrides a
 # duplicate id with a warning rather than raising.
@@ -15,5 +16,9 @@ registration.register(
     id="MIRA/SO101PointToPoint-v0",
     entry_point="mira.envs.so101_point_to_point_env:SO101PointToPointEnv",
 )
+registration.register(
+    id="MIRA/SO101PickPlace-v0",
+    entry_point="mira.envs.so101_pick_place_env:SO101PickPlaceEnv",
+)
 
-__all__ = ["SO101ReachEnv", "SO101PointToPointEnv"]
+__all__ = ["SO101ReachEnv", "SO101PointToPointEnv", "SO101PickPlaceEnv"]
