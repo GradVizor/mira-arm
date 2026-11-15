@@ -34,8 +34,7 @@ Contains a MuJoCo (MJCF) model of the SO-101 arm, Python scripts (headless sim, 
 │       ├── scene.xml           # entry point; <include>s active calib + scene props (coffee_cup, marshmallow)
 │       ├── scene_with_coffee_mug.xml # prop scene variant (mug + marshmallow)
 │       ├── scene_with_markers.xml     # A/B target-marker scene variant
-│       ├── so101_new_calib.xml # ACTIVE calib (virtual zero = mid-range)
-│       ├── so101_old_calib.xml # inactive calib (virtual zero = fully extended)
+│       ├── so101_calib.xml # calib (virtual zero = mid-range)
 │       └── assets/             # 14 .stl: 13 arm meshes + coffee_mug.stl scene prop (meshdir relative)
 ├── scripts/
 │   ├── sim.py              # headless sinusoidal demo → PNGs + GIF into outputs/
@@ -100,7 +99,7 @@ Contains a MuJoCo (MJCF) model of the SO-101 arm, Python scripts (headless sim, 
 
 Key constants: `REPO_ROOT`/`MODEL_DIR`/`SCENE_XML` from `Path(__file__).resolve().parent.parent` in both scripts; `RENDER_W/H=640/480`, `FPS_RENDER=30` in `sim.py`.
 
-`models/so101/` — MJCF chain: `scene.xml` `<include>`s the active calibration XML (currently `so101_new_calib.xml`), which **inlines its own `sts3215` defaults**. (The orphaned, stale `joints_properties.xml` was deleted — no include ever referenced it.) `scene.xml` has no `<compiler>` of its own → it inherits `angle="radian" meshdir="assets"` from the included calib XML. Full model internals — default classes, gains, per-joint `ctrlrange`, props, Onshape element IDs — live in **`models/so101/AGENTS.md`**.
+`models/so101/` — MJCF chain: `scene.xml` `<include>`s the calibration XML (`so101_calib.xml`), which **inlines its own `sts3215` defaults**. (The orphaned, stale `joints_properties.xml` was deleted — no include ever referenced it.) `scene.xml` has no `<compiler>` of its own → it inherits `angle="radian" meshdir="assets"` from the included calib XML. Full model internals — default classes, gains, per-joint `ctrlrange`, props, Onshape element IDs — live in **`models/so101/AGENTS.md`**.
 
 ## COMMANDS
 
@@ -165,7 +164,7 @@ No lint/typecheck/CI targets exist; the self-checks are scripts. Smoke test: `py
 - `.dockerignore` mirrors `.gitignore` (plus `.git`) so `outputs/` and caches never enter the Docker build context.
 - `.omo/` and `.codegraph/` are gitignored agent/editor state — never treat them as sources.
 - `mira/envs/so101_reach_env.py` reads only the **6 arm joints by name**: `scene.xml` adds two free-joint props, so `nq=20`/`nv=18` — never index `qpos[:6]`. Control dt = `model.opt.timestep × frame_skip` (0.002 × 5 = 0.01 s). Reward = `-‖gripperframe − target‖`; success < 2 cm. Gripper action maps to the LeRobot linear convention (`-1`=closed→`0`, `+1`=open→`100`).
-- `mira/pick_place_model.py` builds flat gripper pads at runtime with `MjSpec` and disables the original tapered finger-mesh collisions. Do not hand-edit `so101_new_calib.xml`; pads + `force_limit=0.5` are what make the 4.7 g marshmallow graspable. The 3.35 N·m stock limit ejects it.
+- `mira/pick_place_model.py` builds flat gripper pads at runtime with `MjSpec` and disables the original tapered finger-mesh collisions. Do not hand-edit `so101_calib.xml`; pads + `force_limit=0.5` are what make the 4.7 g marshmallow graspable. The 3.35 N·m stock limit ejects it.
 - 5-DOF grasp constraint: position + world-down + yaw is overconstrained. The natural grasp yaw at the marshmallow target is ~40.87°; align the box yaw (or randomize ±6° around it). The stock finger mesh cannot grasp an axis-aligned box top-down.
 - `scripts/test_grasp.py` is the Step 0 acceptance test (exit 0=PASS, 1=FAIL); it does not involve the cup. `SO101PickPlaceEnv` is the Step 1/2 env: 21-dim state obs, 6-dim action, success `xy < 2 cm` + `0.01 < z < 0.06` + cup upright. It also has cup-pinning (`fix_cup`), workspace/cup-tip failure termination, and curriculum flags (`randomize_box`, `randomize_box_pos`, `randomize_cup_pos`, `randomize_physics`). `scripts/train_pick_place.py` trains SAC with `NormalizeObservation` and the four-stage curriculum; it saves `final_model.zip`, `norm_stats.npz`, checkpoints, and `summary.json` per stage under `outputs/sac_pick_place/` by default.
 - Phase 2 (tabular TD) is **complete and archived** — the learner/CLI/tests were deleted once the arm path moved to function approximation. Its findings (`FrozenLake` 0.733 ceiling, `CliffWalking` 13-step Q-learning vs 17-step SARSA, one-seed-is-noise) are preserved in `docs/TABULAR_RL.md`; recover the code with `git show 8174a96`.

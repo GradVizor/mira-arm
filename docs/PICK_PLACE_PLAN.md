@@ -87,7 +87,7 @@ Verified facts (do not re-derive):
 
 - `scene.xml` is clean — use `scene_with_coffee_mug.xml` for props. (AGENTS.md note about `scene.xml` carrying props is stale.)
 - Cup is 16 thin wall boxes: fix/weld it for Stage 1, release later; it can tip on contact.
-- **Stock finger meshes cannot grasp the marshmallow.** Their tapered tips contact the box’s top corners and press it into the floor. Use the flat pads in `mira/pick_place_model.py` and keep the original finger-mesh collisions disabled. Do **not** hand-edit `so101_new_calib.xml`.
+- **Stock finger meshes cannot grasp the marshmallow.** Their tapered tips contact the box’s top corners and press it into the floor. Use the flat pads in `mira/pick_place_model.py` and keep the original finger-mesh collisions disabled. Do **not** hand-edit `so101_calib.xml`.
 - **5-DOF yaw constraint:** position + world-down + yaw is overconstrained. The natural grasp yaw is ~40.87°, so a top-down grasp of an axis-aligned box is not reachable. Align the box yaw to ~40.9° or randomize around it.
 - **Gripper force cap:** the model’s 3.35 N·m max ejects the 4.7 g box. The pad model caps it at 0.5 N·m; `test_grasp.py` uses `--force 0.5`.
 - `scripts/test_grasp.py` exits 0 on PASS and 1 on FAIL; it does not involve the cup.

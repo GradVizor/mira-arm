@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """MIRA (SO-ARM100/SO-101) MuJoCo simulation with headless rendering.
 
-Loads scene.xml (which includes so101_new_calib.xml + floor + lights),
+Loads scene.xml (which includes so101_calib.xml + floor + lights),
 drives all 6 actuators with smooth sinusoidal trajectories, renders frames,
 and saves a GIF demo.
 

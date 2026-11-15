@@ -34,19 +34,17 @@ You can select a scene via CLI flags/env vars:
 
 ## Calibration
 
-Both scenes support two differently calibrated SO-101 files:
+The scene includes a single calibrated SO-101 file:
 
-- **New calibration (default)** — each joint's virtual zero is the **middle** of its joint range → `so101_new_calib.xml`.
-- **Old calibration** — each joint's virtual zero is the configuration where the robot is **fully extended horizontally** → `so101_old_calib.xml`.
+- **Calibration (default)** — each joint's virtual zero is the **middle** of its joint range → `so101_calib.xml`.
 
-Switch by editing the `<include file="..." />` line in the scene XML you want to use.
+Switch scenes/calibration by editing the `<include file="..." />` line in the scene XML you want to use.
 
 ## Motor parameters
 
 STS3215 position servos, motor properties adapted from the [Open Duck Mini project](https://github.com/apirrone/Open_Duck_Mini).
 
-- **Active model (`so101_new_calib.xml`)** — `kp=998.22`, `kv=2.731` (gains per the [RBE501 RL-arm project](https://github.com/Gregory119/RBE501-RL-arm-project), assuming servo proportional gain 16); joint `damping=0.60`, `frictionloss=0.052`, `armature=0.028`. The `sts3215` class default `forcerange` is ±2.94, but every actuator overrides it to `-3.35 3.35` (also its `ctrlrange`).
-- **Old calibration (`so101_old_calib.xml`)** — `kp=17.8`.
+- **Active model (`so101_calib.xml`)** — `kp=998.22`, `kv=2.731` (gains per the [RBE501 RL-arm project](https://github.com/Gregory119/RBE501-RL-arm-project), assuming servo proportional gain 16); joint `damping=0.60`, `frictionloss=0.052`, `armature=0.028`. The `sts3215` class default `forcerange` is ±2.94, but every actuator overrides it to `-3.35 3.35` (also its `ctrlrange`).
 
 ## Gripper note
 
