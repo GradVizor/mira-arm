@@ -13,6 +13,7 @@ Run::
     python3 scripts/oracle_pick_place.py
     python3 scripts/oracle_pick_place.py --seed 0 --verbose
     python3 scripts/oracle_pick_place.py --viewer            # live window
+    python3 scripts/oracle_pick_place.py --gif               # save an animated GIF
     python3 scripts/oracle_pick_place.py --out /tmp/oracle_summary.json
 
 Exit code is 0 only when the environment reports ``is_success=True`` at least
@@ -58,6 +59,12 @@ LIFT_HEIGHT = 0.075  # lift, 7.5 cm above the grasp pose
 CUP_HIGH_Z = 0.11  # transport waypoint; 0.13 is unreachable with world-down IK
 CUP_LOW_Z = 0.095  # release height; cup rim is z ~= 0.078
 IK_POS_TOL = 0.01  # metres; refuse to execute a worse solution
+
+GIF_PATH = REPO_ROOT / "outputs" / "oracle_pick_place.gif"
+GIF_TOP_PATH = REPO_ROOT / "outputs" / "oracle_pick_place_top.gif"
+GIF_FPS = 30
+GIF_SAMPLE_EVERY = 3
+GIF_W, GIF_H = 480, 360
 
 
 def _joint_mid(env: SO101PickPlaceEnv) -> np.ndarray:
@@ -191,6 +198,48 @@ def _update_stats(stats: dict, info: dict) -> None:
     stats["grasped"] = bool(info["grasped"])
 
 
+def _setup_camera(lookat: np.ndarray, top_view: bool = False) -> mujoco.MjvCamera:
+    cam = mujoco.MjvCamera()
+    cam.type = mujoco.mjtCamera.mjCAMERA_FREE
+    cam.lookat[:] = lookat
+    cam.distance = 0.45 if top_view else 0.60
+    cam.azimuth = 90.0 if top_view else 135.0
+    cam.elevation = 90.0 if top_view else 25.0
+    return cam
+
+
+class _GifRecorder:
+    """Mutable frame accumulator for the headless GIF capture."""
+
+    def __init__(
+        self, model: mujoco.MjModel, lookat: np.ndarray, top_view: bool = False
+    ) -> None:
+        self.renderer = mujoco.Renderer(model, height=GIF_H, width=GIF_W)
+        self.camera = _setup_camera(lookat, top_view)
+        self.frames: list[np.ndarray] = []
+        self.step = 0
+
+    def capture(self, data: mujoco.MjData) -> None:
+        if self.step % GIF_SAMPLE_EVERY == 0:
+            self.renderer.update_scene(data, self.camera)
+            self.frames.append(self.renderer.render().copy())
+        self.step += 1
+
+    def save(self, path: Path) -> None:
+        from PIL import Image
+
+        pil_frames = [Image.fromarray(rgb) for rgb in self.frames]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        pil_frames[0].save(
+            str(path),
+            save_all=True,
+            append_images=pil_frames[1:],
+            duration=int(1000 / GIF_FPS),
+            loop=0,
+        )
+        print(f"[gif] saved {path} ({len(pil_frames)} frames @ {GIF_FPS} fps)")
+
+
 def _ramp(
     env: SO101PickPlaceEnv,
     phase: str,
@@ -202,6 +251,7 @@ def _ramp(
     stats: dict,
     verbose: bool,
     viewer: mujoco.viewer.Handle | None = None,
+    recorder: _GifRecorder | None = None,
 ) -> dict:
     control_dt = env.model.opt.timestep * env.frame_skip
     phase_steps = 0
@@ -212,6 +262,8 @@ def _ramp(
         q = q_from + t * (q_to - q_from)
         grip = grip_from + t * (grip_to - grip_from)
         _, _, terminated, truncated, info = env.step(_to_action(env, q, grip))
+        if recorder is not None:
+            recorder.capture(env.data)
         if viewer is not None and viewer.is_running():
             viewer.sync()
             time.sleep(control_dt)
@@ -260,6 +312,12 @@ def run(args: argparse.Namespace) -> bool:
 
         box_pos = np.asarray(info["box_pos"], dtype=np.float64).copy()
         cup_pos = np.asarray(info["cup_pos"], dtype=np.float64).copy()
+
+        recorder: _GifRecorder | None = None
+        if args.gif:
+            lookat = 0.5 * (box_pos + cup_pos)
+            lookat[2] = 0.10
+            recorder = _GifRecorder(env.model, lookat, args.top_view)
 
         # --- Grasp pose: pad midpoint at the box centre + PAD_MIDPOINT_Z. ---
         desired_grasp = box_pos + np.array([0.0, 0.0, GRASP_HEIGHT])
@@ -380,6 +438,7 @@ def run(args: argparse.Namespace) -> bool:
                 stats,
                 args.verbose,
                 viewer,
+                recorder,
             )
         )
         phases.append(
@@ -394,6 +453,7 @@ def run(args: argparse.Namespace) -> bool:
                 stats,
                 args.verbose,
                 viewer,
+                recorder,
             )
         )
         phases.append(
@@ -408,6 +468,7 @@ def run(args: argparse.Namespace) -> bool:
                 stats,
                 args.verbose,
                 viewer,
+                recorder,
             )
         )
         phases.append(
@@ -422,6 +483,7 @@ def run(args: argparse.Namespace) -> bool:
                 stats,
                 args.verbose,
                 viewer,
+                recorder,
             )
         )
         phases.append(
@@ -436,6 +498,7 @@ def run(args: argparse.Namespace) -> bool:
                 stats,
                 args.verbose,
                 viewer,
+                recorder,
             )
         )
         phases.append(
@@ -450,6 +513,7 @@ def run(args: argparse.Namespace) -> bool:
                 stats,
                 args.verbose,
                 viewer,
+                recorder,
             )
         )
         phases.append(
@@ -464,6 +528,7 @@ def run(args: argparse.Namespace) -> bool:
                 stats,
                 args.verbose,
                 viewer,
+                recorder,
             )
         )
         phases.append(
@@ -478,8 +543,12 @@ def run(args: argparse.Namespace) -> bool:
                 stats,
                 args.verbose,
                 viewer,
+                recorder,
             )
         )
+
+        if recorder is not None:
+            recorder.save(GIF_TOP_PATH if args.top_view else GIF_PATH)
 
         final_box = np.asarray(stats["box_pos"], dtype=np.float64)
         final_cup = np.asarray(stats["cup_pos"], dtype=np.float64)
@@ -558,6 +627,16 @@ def parse_args() -> argparse.Namespace:
         "--viewer",
         action="store_true",
         help="open a live MuJoCo viewer (requires a display; real-time playback)",
+    )
+    parser.add_argument(
+        "--gif",
+        action="store_true",
+        help=f"save an animated GIF to {GIF_PATH}",
+    )
+    parser.add_argument(
+        "--top-view",
+        action="store_true",
+        help=f"with --gif, render from above into {GIF_TOP_PATH}",
     )
     parser.add_argument(
         "--verbose",
